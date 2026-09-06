@@ -28,8 +28,10 @@ HTML_TEMPLATE = '''
         label { font-weight: bold; display: block; margin-top: 15px; margin-bottom: 5px; font-size: 14px;}
         input[type="file"], input[type="text"] { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
         
-        .range-container { margin-top: 8px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #555;}
-        input[type="range"] { width: 80%; }
+        .control-row { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #555;}
+        .control-row input[type="range"] { width: 40%; }
+        .color-picker { display: flex; align-items: center; gap: 5px; }
+        input[type="color"] { border: none; width: 28px; height: 28px; padding: 0; background: none; cursor: pointer; border-radius: 4px; }
 
         button { width: 100%; padding: 14px; margin-top: 20px; background-color: var(--tg-theme-button-color, #2196F3); color: var(--tg-theme-button-text-color, #fff); border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
         button:active { opacity: 0.8; }
@@ -37,7 +39,7 @@ HTML_TEMPLATE = '''
         
         #previewArea { display: none; position: relative; width: 100%; border: 2px dashed #bbb; border-radius: 8px; margin-top: 15px; overflow: hidden; background: #eee;}
         #imageStack img { width: 100%; display: block; pointer-events: none; }
-        .drag-text { position: absolute; background-color: #0092fa; color: white; padding: 6px 10px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: grab; user-select: none; touch-action: none; box-shadow: 0 2px 5px rgba(0,0,0,0.4); z-index: 10; white-space: nowrap; transform-origin: top left;}
+        .drag-text { position: absolute; background-color: #0092fa; color: white; padding: 6px 10px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: grab; user-select: none; touch-action: none; box-shadow: 0 2px 5px rgba(0,0,0,0.4); z-index: 10; white-space: nowrap; transform-origin: top left; text-align: center;}
         .drag-text:active { cursor: grabbing; }
         .guide-text { font-size: 12px; color: #e91e63; font-style: italic; display: none; margin-top: 5px; font-weight: bold;}
     </style>
@@ -51,21 +53,29 @@ HTML_TEMPLATE = '''
             <label>1. Chọn các ảnh để ghép:</label>
             <input type="file" id="images" name="images" accept="image/*" multiple required>
             
-            <label>2. Chữ góc trên (VD: Ms1377):</label>
+            <label>2. Chữ góc trên:</label>
             <input type="text" id="text1" name="text1" placeholder="Bỏ trống nếu không chèn">
-            <div class="range-container">
-                <span>Cỡ chữ 1:</span>
+            <div class="control-row">
+                <span>Cỡ chữ:</span>
                 <input type="range" id="size1" min="10" max="40" value="16">
+                <div class="color-picker">
+                    <label>Màu nền:</label><input type="color" id="bc1" name="bc1" value="#0092fa">
+                    <label>Chữ:</label><input type="color" id="tc1" name="tc1" value="#ffffff">
+                </div>
             </div>
             
-            <label>3. Chữ góc dưới (VD: Login...):</label>
+            <label>3. Chữ góc dưới:</label>
             <input type="text" id="text2" name="text2" placeholder="Bỏ trống nếu không chèn">
-            <div class="range-container">
-                <span>Cỡ chữ 2:</span>
+            <div class="control-row">
+                <span>Cỡ chữ:</span>
                 <input type="range" id="size2" min="10" max="40" value="16">
+                <div class="color-picker">
+                    <label>Màu nền:</label><input type="color" id="bc2" name="bc2" value="#0092fa">
+                    <label>Chữ:</label><input type="color" id="tc2" name="tc2" value="#ffffff">
+                </div>
             </div>
             
-            <div id="guideText" class="guide-text">👇 Kéo thả ô chữ để dời vị trí, dùng thanh trượt để phóng to/thu nhỏ!</div>
+            <div id="guideText" class="guide-text">👇 Kéo thả ô chữ để dời vị trí. Phóng to và đổi màu ở trên!</div>
             
             <div id="previewArea">
                 <div id="imageStack"></div>
@@ -85,12 +95,11 @@ HTML_TEMPLATE = '''
             document.getElementById('chat_id').value = tg.initDataUnsafe.user.id;
         } else { document.getElementById('chat_id').value = "0"; }
 
-        const txt1 = document.getElementById('text1');
-        const txt2 = document.getElementById('text2');
-        const wm1 = document.getElementById('wm1');
-        const wm2 = document.getElementById('wm2');
-        const size1 = document.getElementById('size1');
-        const size2 = document.getElementById('size2');
+        const txt1 = document.getElementById('text1'); const txt2 = document.getElementById('text2');
+        const wm1 = document.getElementById('wm1'); const wm2 = document.getElementById('wm2');
+        const size1 = document.getElementById('size1'); const size2 = document.getElementById('size2');
+        const tc1 = document.getElementById('tc1'); const bc1 = document.getElementById('bc1');
+        const tc2 = document.getElementById('tc2'); const bc2 = document.getElementById('bc2');
         const guideText = document.getElementById('guideText');
 
         function updateWm() {
@@ -99,18 +108,19 @@ HTML_TEMPLATE = '''
             if(txt2.value.trim()){ wm2.innerText = txt2.value; wm2.style.display = 'inline-block'; hasText = true;} else { wm2.style.display = 'none'; }
             
             wm1.style.fontSize = size1.value + 'px';
+            wm1.style.color = tc1.value;
+            wm1.style.backgroundColor = bc1.value;
+            
             wm2.style.fontSize = size2.value + 'px';
+            wm2.style.color = tc2.value;
+            wm2.style.backgroundColor = bc2.value;
             
             if(hasText && document.getElementById('images').files.length > 0) {
                 guideText.style.display = 'block';
-            } else {
-                guideText.style.display = 'none';
-            }
+            } else { guideText.style.display = 'none'; }
         }
-        txt1.addEventListener('input', updateWm);
-        txt2.addEventListener('input', updateWm);
-        size1.addEventListener('input', updateWm);
-        size2.addEventListener('input', updateWm);
+        
+        [txt1, txt2, size1, size2, tc1, bc1, tc2, bc2].forEach(el => el.addEventListener('input', updateWm));
 
         document.getElementById('images').addEventListener('change', function(e){
             const files = e.target.files;
@@ -132,26 +142,19 @@ HTML_TEMPLATE = '''
 
         function makeDrag(el) {
             let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-            el.ontouchstart = dragStart;
-            el.onmousedown = dragStart;
-
+            el.ontouchstart = dragStart; el.onmousedown = dragStart;
             function dragStart(e) {
                 e.preventDefault();
                 let ev = e.type.includes('touch') ? e.touches[0] : e;
-                pos3 = ev.clientX;
-                pos4 = ev.clientY;
-                document.ontouchend = dragEnd;
-                document.ontouchmove = dragMove;
-                document.onmouseup = dragEnd;
-                document.onmousemove = dragMove;
+                pos3 = ev.clientX; pos4 = ev.clientY;
+                document.ontouchend = dragEnd; document.ontouchmove = dragMove;
+                document.onmouseup = dragEnd; document.onmousemove = dragMove;
             }
             function dragMove(e) {
                 e.preventDefault();
                 let ev = e.type.includes('touch') ? e.touches[0] : e;
-                pos1 = pos3 - ev.clientX;
-                pos2 = pos4 - ev.clientY;
-                pos3 = ev.clientX;
-                pos4 = ev.clientY;
+                pos1 = pos3 - ev.clientX; pos2 = pos4 - ev.clientY;
+                pos3 = ev.clientX; pos4 = ev.clientY;
                 
                 let parent = el.parentElement;
                 let newTop = el.offsetTop - pos2;
@@ -162,8 +165,7 @@ HTML_TEMPLATE = '''
                 if(newTop + el.offsetHeight > parent.offsetHeight) newTop = parent.offsetHeight - el.offsetHeight;
                 if(newLeft + el.offsetWidth > parent.offsetWidth) newLeft = parent.offsetWidth - el.offsetWidth;
                 
-                el.style.top = newTop + "px";
-                el.style.left = newLeft + "px";
+                el.style.top = newTop + "px"; el.style.left = newLeft + "px";
             }
             function dragEnd() {
                 document.ontouchend = null; document.ontouchmove = null;
@@ -188,12 +190,9 @@ HTML_TEMPLATE = '''
             let x2_pct = wm2.offsetLeft / parent.offsetWidth;
             let y2_pct = wm2.offsetTop / parent.offsetHeight;
 
-            formData.append('x1', x1_pct);
-            formData.append('y1', y1_pct);
-            formData.append('x2', x2_pct);
-            formData.append('y2', y2_pct);
-            formData.append('scale1', size1.value);
-            formData.append('scale2', size2.value);
+            formData.append('x1', x1_pct); formData.append('y1', y1_pct);
+            formData.append('x2', x2_pct); formData.append('y2', y2_pct);
+            formData.append('scale1', size1.value); formData.append('scale2', size2.value);
 
             fetch('/api/process', { method: 'POST', body: formData })
             .then(response => response.json())
@@ -228,6 +227,12 @@ def process_images():
         text1 = request.form.get('text1', '').strip()
         text2 = request.form.get('text2', '').strip()
         
+        # Nhận màu RGB từ điện thoại
+        tc1 = request.form.get('tc1', '#ffffff')
+        bc1 = request.form.get('bc1', '#0092fa')
+        tc2 = request.form.get('tc2', '#ffffff')
+        bc2 = request.form.get('bc2', '#0092fa')
+        
         x1_pct = float(request.form.get('x1', 0.05))
         y1_pct = float(request.form.get('y1', 0.1))
         x2_pct = float(request.form.get('x2', 0.05))
@@ -252,10 +257,10 @@ def process_images():
             anh_moi.paste(anh, (0, toa_do_y))
             toa_do_y += anh.size[1]
 
-        def tao_anh_chu(text, max_rong, browser_px):
+        def tao_anh_chu(text, max_rong, browser_px, text_color, bg_color):
             if not text: return None
             
-            preview_base_width = 350 
+            preview_base_width = 350
             ratio = max_rong / preview_base_width
             font_size = int(browser_px * ratio * 1.2)
             
@@ -269,18 +274,34 @@ def process_images():
             
             temp_img = Image.new("RGBA", (1, 1))
             temp_draw = ImageDraw.Draw(temp_img)
+            
+            # Tính toán kích thước thật của Text để canh giữa hoàn hảo
             bbox = temp_draw.textbbox((0, 0), text, font=font)
-            padding_x, padding_y = int(font_size * 0.7), int(font_size * 0.4)
-            wm_w = (bbox[2] - bbox[0]) + padding_x * 2
-            wm_h = (bbox[3] - bbox[1]) + padding_y * 2
+            left, top, right, bottom = bbox
+            text_w = right - left
+            text_h = bottom - top
+            
+            padding_x = int(font_size * 0.7)
+            padding_y = int(font_size * 0.4)
+            wm_w = text_w + padding_x * 2
+            wm_h = text_h + padding_y * 2
+            
             wm_img = Image.new("RGBA", (wm_w, wm_h), (0, 0, 0, 0))
             draw = ImageDraw.Draw(wm_img)
-            draw.rounded_rectangle([0, 0, wm_w, wm_h], radius=int(font_size * 0.4), fill="#0092fa")
-            draw.text((padding_x, padding_y - int(font_size * 0.1)), text, fill="white", font=font)
+            
+            # Vẽ nền bằng màu đã chọn
+            draw.rounded_rectangle([0, 0, wm_w, wm_h], radius=int(font_size * 0.35), fill=bg_color)
+            
+            # Canh giữa chữ chuẩn (trừ đi offset của font)
+            text_x = (wm_w - text_w) / 2 - left
+            text_y = (wm_h - text_h) / 2 - top
+            
+            # Vẽ chữ bằng màu đã chọn
+            draw.text((text_x, text_y), text, fill=text_color, font=font)
             return wm_img
 
-        wm1 = tao_anh_chu(text1, max_rong, scale1)
-        wm2 = tao_anh_chu(text2, max_rong, scale2)
+        wm1 = tao_anh_chu(text1, max_rong, scale1, tc1, bc1)
+        wm2 = tao_anh_chu(text2, max_rong, scale2, tc2, bc2)
 
         if wm1: anh_moi.paste(wm1, (int(max_rong * x1_pct), int(tong_cao * y1_pct)), mask=wm1)
         if wm2: anh_moi.paste(wm2, (int(max_rong * x2_pct), int(tong_cao * y2_pct)), mask=wm2)
