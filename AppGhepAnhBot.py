@@ -227,7 +227,6 @@ def process_images():
         text1 = request.form.get('text1', '').strip()
         text2 = request.form.get('text2', '').strip()
         
-        # Nhận màu RGB từ điện thoại
         tc1 = request.form.get('tc1', '#ffffff')
         bc1 = request.form.get('bc1', '#0092fa')
         tc2 = request.form.get('tc2', '#ffffff')
@@ -275,7 +274,6 @@ def process_images():
             temp_img = Image.new("RGBA", (1, 1))
             temp_draw = ImageDraw.Draw(temp_img)
             
-            # Tính toán kích thước thật của Text để canh giữa hoàn hảo
             bbox = temp_draw.textbbox((0, 0), text, font=font)
             left, top, right, bottom = bbox
             text_w = right - left
@@ -289,14 +287,11 @@ def process_images():
             wm_img = Image.new("RGBA", (wm_w, wm_h), (0, 0, 0, 0))
             draw = ImageDraw.Draw(wm_img)
             
-            # Vẽ nền bằng màu đã chọn
             draw.rounded_rectangle([0, 0, wm_w, wm_h], radius=int(font_size * 0.35), fill=bg_color)
             
-            # Canh giữa chữ chuẩn (trừ đi offset của font)
             text_x = (wm_w - text_w) / 2 - left
             text_y = (wm_h - text_h) / 2 - top
             
-            # Vẽ chữ bằng màu đã chọn
             draw.text((text_x, text_y), text, fill=text_color, font=font)
             return wm_img
 
@@ -306,11 +301,17 @@ def process_images():
         if wm1: anh_moi.paste(wm1, (int(max_rong * x1_pct), int(tong_cao * y1_pct)), mask=wm1)
         if wm2: anh_moi.paste(wm2, (int(max_rong * x2_pct), int(tong_cao * y2_pct)), mask=wm2)
 
+        # Lưu ảnh với chất lượng 100%
         img_byte_arr = io.BytesIO()
-        anh_moi.save(img_byte_arr, format='JPEG', quality=90)
+        anh_moi.save(img_byte_arr, format='JPEG', quality=100)
         img_byte_arr.seek(0)
+        
+        # Bắt buộc đặt tên file để Telegram biết gửi dưới dạng Document (HD)
+        img_byte_arr.name = 'Anh_HD_FCMobile.jpg'
 
-        if chat_id and chat_id != "0": bot.send_photo(chat_id, img_byte_arr, caption="✅ Ảnh của bạn đã ghép xong!")
+        if chat_id and chat_id != "0": 
+            # Dùng lệnh send_document thay vì send_photo
+            bot.send_document(chat_id, img_byte_arr, caption="✅ Ảnh HD cực nét của bạn đã ghép xong!")
         return {"success": True, "message": "Hoàn tất"}
     except Exception as e:
         return {"success": False, "message": str(e)}
