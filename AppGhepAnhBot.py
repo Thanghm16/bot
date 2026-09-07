@@ -75,6 +75,9 @@ HTML_TEMPLATE = '''
                 </div>
             </div>
             
+            <label>4. Tên file lưu (Tùy chọn):</label>
+            <input type="text" id="filename" name="filename" placeholder="Mặc định: Anh_HD_FCMobile">
+            
             <div id="guideText" class="guide-text">👇 Kéo thả ô chữ để dời vị trí. Phóng to và đổi màu ở trên!</div>
             
             <div id="previewArea">
@@ -91,9 +94,20 @@ HTML_TEMPLATE = '''
     <script>
         let tg = window.Telegram.WebApp;
         tg.expand();
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        
+        // Lấy ID Nhóm hoặc ID Người dùng
+        const urlParams = new URLSearchParams(window.location.search);
+        const cid = urlParams.get('cid');
+        
+        if (cid) {
+            document.getElementById('chat_id').value = cid;
+        } else if (tg.initDataUnsafe && tg.initDataUnsafe.chat) {
+            document.getElementById('chat_id').value = tg.initDataUnsafe.chat.id;
+        } else if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
             document.getElementById('chat_id').value = tg.initDataUnsafe.user.id;
-        } else { document.getElementById('chat_id').value = "0"; }
+        } else { 
+            document.getElementById('chat_id').value = "0"; 
+        }
 
         const txt1 = document.getElementById('text1'); const txt2 = document.getElementById('text2');
         const wm1 = document.getElementById('wm1'); const wm2 = document.getElementById('wm2');
@@ -227,6 +241,9 @@ def process_images():
         text1 = request.form.get('text1', '').strip()
         text2 = request.form.get('text2', '').strip()
         
+        # Nhận tên file tùy chỉnh từ form
+        custom_filename = request.form.get('filename', '').strip()
+        
         tc1 = request.form.get('tc1', '#ffffff')
         bc1 = request.form.get('bc1', '#0092fa')
         tc2 = request.form.get('tc2', '#ffffff')
@@ -301,16 +318,20 @@ def process_images():
         if wm1: anh_moi.paste(wm1, (int(max_rong * x1_pct), int(tong_cao * y1_pct)), mask=wm1)
         if wm2: anh_moi.paste(wm2, (int(max_rong * x2_pct), int(tong_cao * y2_pct)), mask=wm2)
 
-        # Lưu ảnh với chất lượng 100%
         img_byte_arr = io.BytesIO()
         anh_moi.save(img_byte_arr, format='JPEG', quality=100)
         img_byte_arr.seek(0)
         
-        # Bắt buộc đặt tên file để Telegram biết gửi dưới dạng Document (HD)
-        img_byte_arr.name = 'Anh_HD_FCMobile.jpg'
+        # Xử lý gán tên file trước khi gửi
+        if not custom_filename:
+            custom_filename = 'Anh_HD_FCMobile'
+        # Đảm bảo đuôi file luôn là .jpg để Telegram nhận diện là hình ảnh HD
+        if not custom_filename.lower().endswith(('.jpg', '.jpeg')):
+            custom_filename += '.jpg'
+            
+        img_byte_arr.name = custom_filename
 
         if chat_id and chat_id != "0": 
-            # Dùng lệnh send_document thay vì send_photo
             bot.send_document(chat_id, img_byte_arr, caption="✅ Ảnh HD cực nét của bạn đã ghép xong!")
         return {"success": True, "message": "Hoàn tất"}
     except Exception as e:
@@ -319,7 +340,8 @@ def process_images():
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
     markup = InlineKeyboardMarkup()
-    btn = InlineKeyboardButton("🎨 Mở Tool Ghép Ảnh", web_app=WebAppInfo(url=WEB_URL))
+    dynamic_url = f"{WEB_URL}?cid={message.chat.id}"
+    btn = InlineKeyboardButton("🎨 Mở Tool Ghép Ảnh", web_app=WebAppInfo(url=dynamic_url))
     markup.add(btn)
     bot.send_message(message.chat.id, "Chào mừng bạn đến với Bot Ghép Ảnh FC Mobile!\n\nHãy nhấn vào nút bên dưới để mở Mini App nhé.", reply_markup=markup)
 
