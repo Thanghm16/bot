@@ -95,7 +95,6 @@ HTML_TEMPLATE = '''
         let tg = window.Telegram.WebApp;
         tg.expand();
         
-        // Lấy ID Nhóm hoặc ID Người dùng
         const urlParams = new URLSearchParams(window.location.search);
         const cid = urlParams.get('cid');
         
@@ -212,7 +211,7 @@ HTML_TEMPLATE = '''
             .then(response => response.json())
             .then(data => {
                 if(data.success) {
-                    tg.showAlert("✅ Thành công! Hãy đóng cửa sổ này và kiểm tra tin nhắn Bot.");
+                    tg.showAlert("✅ Thành công! Hãy đóng cửa sổ này và kiểm tra tin nhắn Nhóm.");
                     tg.close();
                 } else {
                     tg.showAlert("❌ Lỗi: " + data.message);
@@ -240,8 +239,6 @@ def process_images():
         chat_id = request.form.get('chat_id')
         text1 = request.form.get('text1', '').strip()
         text2 = request.form.get('text2', '').strip()
-        
-        # Nhận tên file tùy chỉnh từ form
         custom_filename = request.form.get('filename', '').strip()
         
         tc1 = request.form.get('tc1', '#ffffff')
@@ -263,7 +260,6 @@ def process_images():
 
         cac_anh = [Image.open(f.stream).convert("RGB") for f in files]
         chieu_rong, chieu_cao = zip(*(anh.size for anh in cac_anh))
-        
         max_rong = max(chieu_rong)
         tong_cao = sum(chieu_cao)
         
@@ -275,41 +271,28 @@ def process_images():
 
         def tao_anh_chu(text, max_rong, browser_px, text_color, bg_color):
             if not text: return None
-            
-            preview_base_width = 350
-            ratio = max_rong / preview_base_width
+            ratio = max_rong / 350
             font_size = int(browser_px * ratio * 1.2)
-            
             font_path = "Roboto-Bold.ttf"
             if not os.path.exists(font_path):
                 try: urllib.request.urlretrieve("https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Bold.ttf", font_path)
                 except: pass
-                    
             try: font = ImageFont.truetype(font_path, font_size)
             except: font = ImageFont.load_default()
             
             temp_img = Image.new("RGBA", (1, 1))
             temp_draw = ImageDraw.Draw(temp_img)
-            
             bbox = temp_draw.textbbox((0, 0), text, font=font)
             left, top, right, bottom = bbox
-            text_w = right - left
-            text_h = bottom - top
+            text_w, text_h = right - left, bottom - top
             
-            padding_x = int(font_size * 0.7)
-            padding_y = int(font_size * 0.4)
-            wm_w = text_w + padding_x * 2
-            wm_h = text_h + padding_y * 2
+            padding_x, padding_y = int(font_size * 0.7), int(font_size * 0.4)
+            wm_w, wm_h = text_w + padding_x * 2, text_h + padding_y * 2
             
             wm_img = Image.new("RGBA", (wm_w, wm_h), (0, 0, 0, 0))
             draw = ImageDraw.Draw(wm_img)
-            
             draw.rounded_rectangle([0, 0, wm_w, wm_h], radius=int(font_size * 0.35), fill=bg_color)
-            
-            text_x = (wm_w - text_w) / 2 - left
-            text_y = (wm_h - text_h) / 2 - top
-            
-            draw.text((text_x, text_y), text, fill=text_color, font=font)
+            draw.text(((wm_w - text_w)/2 - left, (wm_h - text_h)/2 - top), text, fill=text_color, font=font)
             return wm_img
 
         wm1 = tao_anh_chu(text1, max_rong, scale1, tc1, bc1)
@@ -322,13 +305,8 @@ def process_images():
         anh_moi.save(img_byte_arr, format='JPEG', quality=100)
         img_byte_arr.seek(0)
         
-        # Xử lý gán tên file trước khi gửi
-        if not custom_filename:
-            custom_filename = 'Anh_HD_FCMobile'
-        # Đảm bảo đuôi file luôn là .jpg để Telegram nhận diện là hình ảnh HD
-        if not custom_filename.lower().endswith(('.jpg', '.jpeg')):
-            custom_filename += '.jpg'
-            
+        if not custom_filename: custom_filename = 'Anh_HD_FCMobile'
+        if not custom_filename.lower().endswith(('.jpg', '.jpeg')): custom_filename += '.jpg'
         img_byte_arr.name = custom_filename
 
         if chat_id and chat_id != "0": 
@@ -339,11 +317,38 @@ def process_images():
 
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
-    markup = InlineKeyboardMarkup()
-    dynamic_url = f"{WEB_URL}?cid={message.chat.id}"
-    btn = InlineKeyboardButton("🎨 Mở Tool Ghép Ảnh", web_app=WebAppInfo(url=dynamic_url))
-    markup.add(btn)
-    bot.send_message(message.chat.id, "Chào mừng bạn đến với Bot Ghép Ảnh FC Mobile!\n\nHãy nhấn vào nút bên dưới để mở Mini App nhé.", reply_markup=markup)
+    try:
+        # Nếu đang ở chat riêng (Private)
+        if message.chat.type == 'private':
+            args = message.text.split()
+            # Nếu mang theo mã ID của nhóm (Từ nhóm bấm sang)
+            if len(args) > 1:
+                group_id = args[1]
+                markup = InlineKeyboardMarkup()
+                dynamic_url = f"{WEB_URL}?cid={group_id}"
+                btn = InlineKeyboardButton("🎨 Mở Tool (Ảnh sẽ gửi vào Nhóm)", web_app=WebAppInfo(url=dynamic_url))
+                markup.add(btn)
+                bot.send_message(message.chat.id, "✅ Đã kết nối với Nhóm!\n\nHãy nhấn nút bên dưới để ghép ảnh. Sau khi xong, ảnh sẽ được ném thẳng vào Nhóm nhé.", reply_markup=markup)
+            # Khởi động ở chat riêng bình thường
+            else:
+                markup = InlineKeyboardMarkup()
+                dynamic_url = f"{WEB_URL}?cid={message.chat.id}"
+                btn = InlineKeyboardButton("🎨 Mở Tool Ghép Ảnh", web_app=WebAppInfo(url=dynamic_url))
+                markup.add(btn)
+                bot.send_message(message.chat.id, "Chào mừng bạn đến với Bot Ghép Ảnh FC Mobile!\n\nHãy nhấn vào nút bên dưới để mở Mini App nhé.", reply_markup=markup)
+        
+        # Nếu người dùng gõ /start ở trong Nhóm (Group/Supergroup)
+        else:
+            bot_info = bot.get_me()
+            # Tạo deep-link chuyển hướng về chat riêng kèm theo ID của nhóm này
+            deep_link = f"https://t.me/{bot_info.username}?start={message.chat.id}"
+            
+            markup = InlineKeyboardMarkup()
+            btn = InlineKeyboardButton("👉 Nhấn vào đây để ghép ảnh", url=deep_link)
+            markup.add(btn)
+            bot.send_message(message.chat.id, "⚠️ Theo luật của Telegram, Tool không mở được trực tiếp trong nhóm.\n\n👇 Bạn hãy bấm nút bên dưới, ảnh ghép xong sẽ tự động gửi thẳng vào nhóm này nhé!", reply_markup=markup)
+    except Exception as e:
+        print(e)
 
 if __name__ == '__main__':
     bot_thread = threading.Thread(target=bot.infinity_polling)
